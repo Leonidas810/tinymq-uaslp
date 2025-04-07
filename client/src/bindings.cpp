@@ -2,6 +2,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h> // Necesario para std::function
 #include "client.h"
+#include "terminal_ui.h"
 
 namespace py = pybind11;
 
@@ -19,4 +20,21 @@ PYBIND11_MODULE(tinymq_module, m) {
                             &tinymq::client::Client::publish))
         .def("is_connected", &tinymq::client::Client::is_connected)
         .def("poll", &tinymq::client::Client::poll);
+
+    py::enum_<tinymq::ui::MessageType>(m, "MessageType")
+        .value("INFO", tinymq::ui::MessageType::INFO)
+        .value("SUCCESS", tinymq::ui::MessageType::SUCCESS)
+        .value("WARNING", tinymq::ui::MessageType::WARNING)
+        .value("ERROR", tinymq::ui::MessageType::ERROR)
+        .value("INCOMING", tinymq::ui::MessageType::INCOMING)
+        .value("OUTGOING", tinymq::ui::MessageType::OUTGOING)
+        .value("SYSTEM", tinymq::ui::MessageType::SYSTEM);
+
+    m.def("print_message", &tinymq::ui::print_message,
+          py::arg("source"), py::arg("message"), py::arg("type") = tinymq::ui::MessageType::INFO);
+
+    m.def("print_divider", &tinymq::ui::print_divider);
+
+    m.def("print_header", &tinymq::ui::print_header,
+          py::arg("app_name"), py::arg("version") = "0.1.0");
 }

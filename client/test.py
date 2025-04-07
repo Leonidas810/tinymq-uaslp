@@ -1,12 +1,19 @@
 import tinymq_module
 
+def on_message_received(topic, message):
+    message_bytes = bytes(message)
+    print(f"Mensaje recibido en el tema '{topic}': {message_bytes.decode('utf-8')}")
+
 def test_client():
     client = tinymq_module.Client("test_client")
     assert not client.is_connected()
     
     client.connect()
-    client.subscribe("test_topic", lambda topic, message: print(f"Received on {topic}: {message}"))
-    client.publish("test_topic", "Felipe es gei?")
+    client.subscribe("test_topic", on_message_received)
+    client.publish("test_topic", "Me he suscrito a este tema")
+    client.unsubscribe("test_topic")
+    client.publish("test_topic", "me he desuscrito de este tema")
+
     input("Presiona Enter para desconectarse...")
     client.disconnect()
 

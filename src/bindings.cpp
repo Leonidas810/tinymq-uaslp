@@ -1,8 +1,9 @@
 // bindings.cpp
 #include <pybind11/pybind11.h>
-#include "broker.h"  // Asegúrate de que la ruta al header sea la correcta
+#include "broker.h" 
 #include "session.h"
 #include "packet.h"
+#include "terminal_ui.h"
 
 namespace py = pybind11;
 
@@ -48,5 +49,27 @@ PYBIND11_MODULE(tinymq_module, m) {
         .def("type", &tinymq::Packet::type, "Obtiene el tipo del paquete")
         .def("flags", &tinymq::Packet::flags, "Obtiene los flags del paquete")
         .def("payload", &tinymq::Packet::payload, "Obtiene el payload del paquete");
+
+    py::enum_<tinymq::ui::MessageType>(m, "MessageType")
+        .value("INFO", tinymq::ui::MessageType::INFO)
+        .value("SUCCESS", tinymq::ui::MessageType::SUCCESS)
+        .value("WARNING", tinymq::ui::MessageType::WARNING)
+        .value("ERROR", tinymq::ui::MessageType::ERROR)
+        .value("INCOMING", tinymq::ui::MessageType::INCOMING)
+        .value("OUTGOING", tinymq::ui::MessageType::OUTGOING)
+        .value("SYSTEM", tinymq::ui::MessageType::SYSTEM)
+        .export_values();
+
+    m.def("get_timestamp", &tinymq::ui::get_timestamp, "Obtiene la marca de tiempo actual");
+
+    m.def("print_message", &tinymq::ui::print_message,
+          py::arg("source"), py::arg("message"), py::arg("type") = tinymq::ui::MessageType::INFO,
+          "Imprime un mensaje formateado en la terminal");
+
+    m.def("print_divider", &tinymq::ui::print_divider, "Imprime un divisor en la terminal");
+
+    m.def("print_header", &tinymq::ui::print_header,
+          py::arg("app_name"), py::arg("version") = "0.1.0",
+          "Imprime un encabezado en la terminal");
 }
 
