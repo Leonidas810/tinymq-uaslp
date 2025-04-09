@@ -1,4 +1,3 @@
-# test.py
 import tinymq_module
 
 # Crea una instancia del Broker
