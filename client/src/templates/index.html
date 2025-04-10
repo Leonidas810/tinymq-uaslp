@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interfaz Casa Inteligente</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        .sensor {
+            background-color: #e0e0e0;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Casa Inteligente</h1>
+        <div id="sensors-container">
+            <!-- Aquí se mostrarán los sensores -->
+        </div>
+    </div>
+
+    <!-- Incluir Socket.IO -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+    <script>
+        // Conectar al servidor de WebSocket
+        const socket = io.connect('http://localhost:5000');
+
+        // Función para actualizar la interfaz con los datos de los sensores
+        function updateSensorData(topic, content) {
+            const container = document.getElementById('sensors-container');
+            let sensorDiv = document.getElementById(topic);
+
+            if (!sensorDiv) {
+                // Si no existe el div para este sensor, crear uno
+                sensorDiv = document.createElement('div');
+                sensorDiv.id = topic;
+                sensorDiv.classList.add('sensor');
+                container.appendChild(sensorDiv);
+            }
+
+            sensorDiv.innerHTML = `<strong>${topic}</strong>: ${content}`;
+        }
+
+        // Escuchar los eventos de 'sensor_update' enviados por el servidor
+        socket.on('sensor_update', function(data) {
+            for (const topic in data) {
+                updateSensorData(topic, data[topic]);
+            }
+        });
+    </script>
+</body>
+</html>
