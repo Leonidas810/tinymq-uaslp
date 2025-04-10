@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from tinymq_module import Client
@@ -10,9 +10,8 @@ app = Flask(__name__)
 CORS(app)
 
 # Crear la instancia de SocketIO permitiendo conexiones de todos los orígenes
-socketio = SocketIO(app, cors_allowed_origins="*")  # Puedes cambiar "*" por el origen que prefieras
+socketio = SocketIO(app, cors_allowed_origins="*") 
 
-# Cliente que gestionará las conexiones con TinyMQ
 client = None
 
 # Lista para almacenar los tópicos y los últimos mensajes
@@ -36,7 +35,6 @@ def on_message(topic, message):
     message_bytes = bytes(message)
     content = message_bytes.decode('utf-8')
     sensor_data[topic] = content
-    # Emitir el mensaje en tiempo real a todos los clientes conectados
     socketio.emit('sensor_update', {topic: content})
 
 # Función para suscribirse a los tópicos
@@ -52,7 +50,6 @@ def subscribe_to_topics():
         client.subscribe(topic, on_message)
         print(f"Cliente suscrito a '{topic}'.")
 
-    # Iniciar la aplicación Flask en un hilo separado
     threading.Thread(target=socketio.run, args=(app,), kwargs={'host': '0.0.0.0', 'port': 5000}).start()
 
 # Ruta principal para renderizar la interfaz web
@@ -66,7 +63,6 @@ def main():
     client = create_client_and_connect()
 
     if client:
-        # Suscribirse a los tópicos (esto puede hacerlo manualmente en la consola)
         subscribe_to_topics()
 
 if __name__ == "__main__":
