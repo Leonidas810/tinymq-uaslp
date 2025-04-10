@@ -1,6 +1,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-#include <pybind11/functional.h> // Necesario para std::function
+#include <pybind11/functional.h>
 #include "client.h"
 #include "terminal_ui.h"
 
