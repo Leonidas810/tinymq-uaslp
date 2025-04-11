@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,22 +12,26 @@
             padding: 0;
             overflow: hidden;
         }
+
         .container {
             position: relative;
             width: 100vw;
             height: 100vh;
             overflow: hidden;
         }
+
         .house-background {
             position: relative;
             width: 100vw;
             height: 100vh;
-            background-image: url('../assets/images/granja.png');
+            background-image: url('images/granja.png');
+
             background-position: center;
-			overflow: hidden;
+            overflow: hidden;
             opacity: 0.8;
             z-index: -1;
         }
+
         h1 {
             text-align: center;
             color: #333;
@@ -35,6 +40,7 @@
             margin: 0;
             border-bottom: 2px solid #ddd;
         }
+
         .sensor {
             position: absolute;
             padding: 15px;
@@ -45,71 +51,74 @@
             color: white;
             font-weight: bold;
         }
+
         .sensor .sensor-title {
             font-size: 1em;
             margin-bottom: 5px;
         }
+
         .sensor .sensor-value {
             font-size: 1.2em;
             margin-top: 5px;
         }
     </style>
 </head>
+
 <body>
     <div class="container">
-        <div class="house-background"></div>
         <h1>Casa Inteligente</h1>
+        <div class="house-background"></div>
         <div id="sensors-container">
             <!-- Aquí se mostrarán los sensores -->
         </div>
     </div>
-    
+
     <!-- Incluir Socket.IO -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
     <script>
         // Mapa para guardar los colores asignados a cada tópico
         const topicColors = {};
-        
+
         // Conectar al servidor de WebSocket
         const socket = io.connect('http://localhost:5000');
-        
+
         // Función para generar un color claro aleatorio
         function getRandomLightColor() {
             // Genera valores RGB para colores claros (valores más altos)
             const r = Math.floor(Math.random() * 155) + 100; // 100-255
             const g = Math.floor(Math.random() * 155) + 100; // 100-255
             const b = Math.floor(Math.random() * 155) + 100; // 100-255
-            
+
             // Asegura que el texto sea oscuro para contraste
             const textColor = (r + g + b > 550) ? '#333' : '#fff';
-            
+
             return {
                 background: `rgb(${r}, ${g}, ${b})`,
                 text: textColor
             };
         }
-        
+
         // Función para actualizar la interfaz con los datos de los sensores
         function updateSensorData(topic, content) {
             const container = document.getElementById('sensors-container');
             let sensorDiv = document.getElementById(topic.replace(/[\/\s]/g, '_'));
-            
+
             // Si no existe el sensor, crear uno nuevo
             if (!sensorDiv) {
                 // Asignar un color aleatorio a este tópico
                 if (!topicColors[topic]) {
                     topicColors[topic] = getRandomLightColor();
                 }
-                
+
                 // Crear el elemento del sensor
                 sensorDiv = document.createElement('div');
                 sensorDiv.id = topic.replace(/[\/\s]/g, '_');
                 sensorDiv.classList.add('sensor');
-                
+
                 // Aplicar el color asignado
                 sensorDiv.style.backgroundColor = topicColors[topic].background;
                 sensorDiv.style.color = topicColors[topic].text;
-                
+
                 // Posición inicial aleatoria
                 const maxX = window.innerWidth - 200;
                 const maxY = window.innerHeight - 100;
@@ -117,26 +126,26 @@
                 const randomY = Math.floor(Math.random() * (maxY - 100)) + 100;
                 sensorDiv.style.left = randomX + 'px';
                 sensorDiv.style.top = randomY + 'px';
-                
+
                 // Hacer el elemento arrastrable
                 makeDraggable(sensorDiv);
-                
+
                 container.appendChild(sensorDiv);
             }
-            
+
             // Actualizar el contenido del sensor
             sensorDiv.innerHTML = `
                 <div class="sensor-title">${topic}</div>
                 <div class="sensor-value">${content}</div>
             `;
         }
-        
+
         // Función para hacer un elemento arrastrable
         function makeDraggable(element) {
             let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-            
+
             element.onmousedown = dragMouseDown;
-            
+
             function dragMouseDown(e) {
                 e = e || window.event;
                 e.preventDefault();
@@ -147,7 +156,7 @@
                 // Llamar a la función cada vez que el cursor se mueva
                 document.onmousemove = elementDrag;
             }
-            
+
             function elementDrag(e) {
                 e = e || window.event;
                 e.preventDefault();
@@ -160,20 +169,21 @@
                 element.style.top = (element.offsetTop - pos2) + "px";
                 element.style.left = (element.offsetLeft - pos1) + "px";
             }
-            
+
             function closeDragElement() {
                 // Detener el movimiento al soltar el botón del ratón
                 document.onmouseup = null;
                 document.onmousemove = null;
             }
         }
-        
+
         // Escuchar los eventos de 'sensor_update' enviados por el servidor
-        socket.on('sensor_update', function(data) {
+        socket.on('sensor_update', function (data) {
             for (const topic in data) {
                 updateSensorData(topic, data[topic]);
             }
         });
     </script>
 </body>
+
 </html>

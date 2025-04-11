@@ -1,3 +1,38 @@
-build
+# Directorios de compilación
+build/
+*/build/
 
+# Entornos virtuales de Python
 venv/
+.venv/
+client/.venv/
+
+# Archivos de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Binarios y librerías
+*.so
+*.a
+*.lib
+*.dll
+*.exe
+
+# Archivos de CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# Archivos de IDE y editor
+.vscode/settings.json
+.idea/
+*.swp
+*~
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db

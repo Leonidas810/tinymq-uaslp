@@ -1,6 +1,7 @@
 {
-    "files.associations": {
-        "*.embeddedhtml": "html",
-        "ctime": "cpp"
-    }
+  "files.associations": {
+    "*.embeddedhtml": "html",
+    "ctime": "cpp"
+  },
+  "cSpell.words": ["tinymq"]
 }
