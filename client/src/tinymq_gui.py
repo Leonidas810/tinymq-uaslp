@@ -1,3 +1,5 @@
+# Instalar sudo apt install python3-tk
+
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 import threading
