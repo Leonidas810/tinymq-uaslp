@@ -1,3 +1,12 @@
+import sys
+import os
+
+# Agrega la ruta del módulo al PYTHONPATH
+client_build_path = "/home/leonardo/tinymq-uaslp/client/build"
+if client_build_path not in sys.path:
+    sys.path.append(client_build_path)
+
+
 from flask import Flask, render_template
 from flask_cors import CORS
 from flask_socketio import SocketIO
