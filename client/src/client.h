@@ -31,6 +31,9 @@ namespace tinymq
 
             bool subscribe(const std::string &topic, const MessageCallback &callback);
 
+            static bool topic_matches(const std::string &sub, const std::string &pub);
+            std::vector<std::string> get_history(const std::string &topic, int limit = 10, int timeout = 5);
+
             // Sobscribe to a topic without a callback
             bool subscribe(const std::string &topic);
 

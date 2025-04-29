@@ -15,6 +15,10 @@ PYBIND11_MODULE(tinymq_module, m)
         .def("disconnect", &tinymq::client::Client::disconnect)
         //.def("subscribe", &tinymq::client::Client::subscribe)
 
+        // Hacer consulta a la bd para un topico
+        .def("get_history", &tinymq::client::Client::get_history,
+             py::arg("topic"), py::arg("limit") = 10, py::arg("timeout") = 5)
+
         .def("subscribe", py::overload_cast<const std::string &, const tinymq::client::MessageCallback &>(
                               &tinymq::client::Client::subscribe))
         .def("subscribe", py::overload_cast<const std::string &>(

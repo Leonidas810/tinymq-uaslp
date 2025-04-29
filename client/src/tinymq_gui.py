@@ -1,16 +1,18 @@
+#!/usr/bin/env python3
 # Instalar sudo apt install python3-tk
 
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 import threading
 import time
+import json
 from tinymq_module import Client
 
 class TinyMQApp:
     def __init__(self, root):
         self.root = root
         self.root.title("TinyMQ Client")
-        self.root.geometry("700x500")
+        self.root.geometry("800x600")
         self.root.configure(bg="#f0f0f0")
         
         self.client = Client("tkinter_client")
@@ -26,11 +28,9 @@ class TinyMQApp:
         self.poll_thread.start()
     
     def create_widgets(self):
-        # Panel principal con pestañas
         notebook = ttk.Notebook(self.root)
         notebook.pack(fill="both", expand=True, padx=10, pady=10)
         
-        # Estilos personalizados
         style = ttk.Style()
         style.configure('TButton', font=('Helvetica', 10))
         style.configure('TLabel', font=('Helvetica', 10))
@@ -40,16 +40,13 @@ class TinyMQApp:
         connection_tab = ttk.Frame(notebook)
         notebook.add(connection_tab, text="Conexión")
         
-        # Frame de conexión
         conn_frame = ttk.LabelFrame(connection_tab, text="Estado de Conexión")
         conn_frame.pack(fill="x", padx=10, pady=10)
         
-        # Estado de conexión
         self.status_var = tk.StringVar(value="Desconectado")
         status_label = ttk.Label(conn_frame, textvariable=self.status_var, font=('Helvetica', 14, 'bold'))
         status_label.pack(pady=10)
         
-        # Botones de conexión
         btn_frame = ttk.Frame(conn_frame)
         btn_frame.pack(pady=10, fill="x")
         
@@ -66,22 +63,17 @@ class TinyMQApp:
         publish_tab = ttk.Frame(notebook)
         notebook.add(publish_tab, text="Publicar")
         
-        # Frame para publicar
         pub_frame = ttk.LabelFrame(publish_tab, text="Publicar Mensaje")
         pub_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
-        # Campo de tópico
         topic_frame = ttk.Frame(pub_frame)
         topic_frame.pack(fill="x", pady=5)
         
         ttk.Label(topic_frame, text="Tópico:").pack(side="left", padx=5)
         self.pub_topic_entry = ttk.Entry(topic_frame)
         self.pub_topic_entry.pack(side="left", padx=5, expand=True, fill="x")
-        # aceptar enter
         self.pub_topic_entry.bind('<Return>', lambda event: self.pub_message_text.focus_set())
 
-        
-        # Campo de mensaje
         msg_frame = ttk.Frame(pub_frame)
         msg_frame.pack(fill="both", expand=True, pady=5)
         
@@ -90,8 +82,6 @@ class TinyMQApp:
         self.pub_message_text.pack(fill="both", expand=True, padx=5, pady=5)
         self.pub_message_text.bind('<Return>', lambda event: self.publish_message())
 
-        
-        # Botón de publicación
         ttk.Button(pub_frame, text="Publicar Mensaje", 
                   command=self.publish_message, style='Big.TButton').pack(pady=10)
         
@@ -99,11 +89,9 @@ class TinyMQApp:
         subscribe_tab = ttk.Frame(notebook)
         notebook.add(subscribe_tab, text="Suscripciones")
         
-        # Frame izquierdo para suscripciones
         sub_frame = ttk.LabelFrame(subscribe_tab, text="Gestión de Suscripciones")
-        sub_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+        sub_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
-        # Campo de tópico para suscripción
         sub_topic_frame = ttk.Frame(sub_frame)
         sub_topic_frame.pack(fill="x", pady=5)
         
@@ -112,7 +100,6 @@ class TinyMQApp:
         self.sub_topic_entry.pack(side="left", padx=5, expand=True, fill="x")
         self.sub_topic_entry.bind('<Return>', lambda event: self.subscribe_to_topic())
         
-        # Botones de suscripción
         btn_sub_frame = ttk.Frame(sub_frame)
         btn_sub_frame.pack(fill="x", pady=10)
         
@@ -121,26 +108,55 @@ class TinyMQApp:
         ttk.Button(btn_sub_frame, text="Cancelar Suscripción", 
                   command=self.unsubscribe_from_topic).pack(side="left", padx=5, expand=True, fill="x")
         
-        # Lista de tópicos suscritos
         ttk.Label(sub_frame, text="Tópicos Suscritos:").pack(anchor="w", padx=5, pady=5)
         self.topics_listbox = tk.Listbox(sub_frame, height=10)
         self.topics_listbox.pack(fill="both", expand=True, padx=5, pady=5)
         
-        # === Pestaña de mensajes ===
+        # === Pestaña de mensajes modificada para incluir historial ===
         messages_tab = ttk.Frame(notebook)
-        notebook.add(messages_tab, text="Mensajes Recibidos")
+        notebook.add(messages_tab, text="Mensajes e Historial")
         
-        # Área de mensajes
-        msg_area_frame = ttk.LabelFrame(messages_tab, text="Mensajes")
-        msg_area_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        messages_paned = ttk.PanedWindow(messages_tab, orient=tk.VERTICAL)
+        messages_paned.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        msg_area_frame = ttk.LabelFrame(messages_paned, text="Mensajes en tiempo real")
+        messages_paned.add(msg_area_frame, weight=1)
         
         self.message_area = scrolledtext.ScrolledText(msg_area_frame)
         self.message_area.pack(fill="both", expand=True, padx=5, pady=5)
-        self.message_area.config(state="disabled")  # Solo lectura
+        self.message_area.config(state="disabled")
         
-        # Botón para limpiar mensajes
         ttk.Button(msg_area_frame, text="Limpiar Mensajes", 
                   command=self.clear_messages).pack(pady=5)
+        
+        hist_frame = ttk.LabelFrame(messages_paned, text="Historial de mensajes")
+        messages_paned.add(hist_frame, weight=1)
+        
+        hist_controls = ttk.Frame(hist_frame)
+        hist_controls.pack(fill="x", pady=5)
+        
+        ttk.Label(hist_controls, text="Tópico:").pack(side="left", padx=5)
+        self.hist_topic_var = tk.StringVar()
+        self.hist_topic_combo = ttk.Combobox(hist_controls, textvariable=self.hist_topic_var, state="readonly")
+        self.hist_topic_combo.pack(side="left", padx=5, fill="x", expand=True)
+        
+        ttk.Label(hist_controls, text="Límite:").pack(side="left", padx=5)
+        self.hist_limit_var = tk.StringVar(value="20")
+        hist_limit_combo = ttk.Combobox(hist_controls, textvariable=self.hist_limit_var, 
+                                       values=["10", "20", "50", "100"], width=5, state="readonly")
+        hist_limit_combo.pack(side="left", padx=5)
+        
+        ttk.Button(hist_controls, text="Cargar Historial", 
+                  command=self.load_history).pack(side="left", padx=5)
+        ttk.Button(hist_controls, text="Refrescar Tópicos", 
+                  command=self.refresh_topics).pack(side="left", padx=5)
+        
+        self.history_area = scrolledtext.ScrolledText(hist_frame, height=10)
+        self.history_area.pack(fill="both", expand=True, padx=5, pady=5)
+        self.history_area.config(state="disabled")
+        
+        ttk.Button(hist_frame, text="Limpiar Historial", 
+                  command=self.clear_history).pack(pady=5)
     
     def connect_to_broker(self):
         if self.client.connect():
@@ -149,6 +165,7 @@ class TinyMQApp:
             self.connect_btn.config(state="disabled")
             self.disconnect_btn.config(state="normal")
             self.add_message("Sistema", "Conectado al broker")
+            self.root.after(1000, self.refresh_topics)
         else:
             messagebox.showerror("Error de Conexión", 
                                "No se pudo conectar al broker. Asegúrate de que esté en ejecución.")
@@ -159,12 +176,15 @@ class TinyMQApp:
         self.status_var.set("Desconectado")
         self.connect_btn.config(state="normal")
         self.disconnect_btn.config(state="disabled")
+        self.subscribed_topics.clear()
+        self.topics_listbox.delete(0, tk.END)
+        self.hist_topic_combo['values'] = []
         self.add_message("Sistema", "Desconectado del broker")
     
     def publish_message(self):
         if not self.is_connected:
             messagebox.showwarning("No conectado", 
-                                "Debes conectarte al broker primero.")
+                                 "Debes conectarte al broker primero.")
             return
         
         topic = self.pub_topic_entry.get().strip()
@@ -172,17 +192,16 @@ class TinyMQApp:
         
         if not topic:
             messagebox.showwarning("Tópico vacío", 
-                                "Por favor, ingresa un tópico.")
+                                 "Por favor, ingresa un tópico.")
             return
         
         if not message:
             messagebox.showwarning("Mensaje vacío", 
-                                "Por favor, ingresa un mensaje.")
+                                 "Por favor, ingresa un mensaje.")
             return
         
         if self.client.publish(topic, message):
             self.add_message("Enviado", f"Tópico: {topic}\nMensaje: {message}")
-            # Limpiar solo el mensaje, no el tópico
             self.pub_message_text.delete("1.0", tk.END)
         else:
             messagebox.showerror("Error", "No se pudo publicar el mensaje.")
@@ -190,14 +209,14 @@ class TinyMQApp:
     def subscribe_to_topic(self):
         if not self.is_connected:
             messagebox.showwarning("No conectado", 
-                                "Debes conectarte al broker primero.")
+                                 "Debes conectarte al broker primero.")
             return
         
         topic = self.sub_topic_entry.get().strip()
         
         if not topic:
             messagebox.showwarning("Tópico vacío", 
-                                "Por favor, ingresa un tópico.")
+                                 "Por favor, ingresa un tópico.")
             return
         
         if topic in self.subscribed_topics:
@@ -209,13 +228,14 @@ class TinyMQApp:
             self.subscribed_topics.add(topic)
             self.topics_listbox.insert(tk.END, topic)
             self.add_message("Sistema", f"Suscrito al tópico: {topic}")
+            self.refresh_topics()
         else:
             messagebox.showerror("Error", "No se pudo suscribir al tópico.")
     
     def unsubscribe_from_topic(self):
         if not self.is_connected:
             messagebox.showwarning("No conectado", 
-                                "Debes conectarte al broker primero.")
+                                 "Debes conectarte al broker primero.")
             return
         
         selection = self.topics_listbox.curselection()
@@ -224,37 +244,36 @@ class TinyMQApp:
             topic = self.sub_topic_entry.get().strip()
             if not topic:
                 messagebox.showwarning("Selección vacía", 
-                                    "Selecciona un tópico de la lista o ingresa uno.")
+                                     "Selecciona un tópico de la lista o ingresa uno.")
                 return
         else:
             topic = self.topics_listbox.get(selection[0])
         
         if topic not in self.subscribed_topics:
             messagebox.showwarning("No suscrito", 
-                                f"No estás suscrito al tópico '{topic}'.")
+                                 f"No estás suscrito al tópico '{topic}'.")
             return
         
         if self.client.unsubscribe(topic):
             self.subscribed_topics.remove(topic)
-            # Actualizar listbox
             self.topics_listbox.delete(0, tk.END)
             for t in self.subscribed_topics:
                 self.topics_listbox.insert(tk.END, t)
             self.add_message("Sistema", f"Cancelada suscripción al tópico: {topic}")
+            self.refresh_topics()
         else:
             messagebox.showerror("Error", "No se pudo cancelar la suscripción.")
     
     def on_message(self, topic, message):
         msg_str = bytes(message).decode('utf-8')
-        # Debemos usar after() porque este callback podría venir de otro hilo
         self.root.after(0, lambda: self.add_message("Recibido", 
-                                                   f"Tópico: {topic}\nMensaje: {msg_str}"))
+                                                  f"Tópico: {topic}\nMensaje: {msg_str}"))
     
     def add_message(self, source, content):
         timestamp = time.strftime("%H:%M:%S")
         self.message_area.config(state="normal")
         self.message_area.insert(tk.END, f"[{timestamp}] [{source}]\n{content}\n\n")
-        self.message_area.see(tk.END)  # Desplazar al final
+        self.message_area.see(tk.END)
         self.message_area.config(state="disabled")
     
     def clear_messages(self):
@@ -262,10 +281,106 @@ class TinyMQApp:
         self.message_area.delete("1.0", tk.END)
         self.message_area.config(state="disabled")
     
+    def refresh_topics(self):
+        if not self.is_connected:
+            messagebox.showwarning("No conectado", 
+                                 "Debes conectarte al broker primero.")
+            return
+        
+        try:
+            if not self.subscribed_topics:
+                return
+            topics_list = list(self.subscribed_topics)
+            self.hist_topic_combo['values'] = topics_list
+            if topics_list and not self.hist_topic_var.get():
+                self.hist_topic_combo.current(0)
+            self.add_message("Sistema", f"Lista de tópicos actualizada: {len(topics_list)} tópicos disponibles")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al refrescar tópicos: {e}")
+    
+    def load_history(self):
+        if not self.is_connected:
+            messagebox.showwarning("No conectado", 
+                                 "Debes conectarte al broker primero.")
+            return
+        
+        topic = self.hist_topic_var.get()
+        if not topic:
+            messagebox.showwarning("Tópico no seleccionado", 
+                                 "Por favor, selecciona un tópico.")
+            return
+        
+        try:
+            limit = int(self.hist_limit_var.get())
+        except ValueError:
+            limit = 20
+        
+        self.history_area.config(state="normal")
+        self.history_area.delete("1.0", tk.END)
+        self.history_area.insert(tk.END, "Cargando historial...\n")
+        self.history_area.config(state="disabled")
+        self.root.update()
+        
+        threading.Thread(target=self._load_history_thread, 
+                        args=(topic, limit), 
+                        daemon=True).start()
+    
+    def _load_history_thread(self, topic, limit):
+        try:
+            messages = self.client.get_history(topic, limit=limit)
+            print(f"[DEBUG] Mensajes recibidos para {topic}: {messages}")
+            self.root.after(0, lambda: self._update_history_area(topic, messages))
+        except Exception as e:
+            import traceback
+            error_info = str(e)
+            if not error_info:
+                error_info = f"Excepción de tipo {type(e).__name__}"
+            print(f"Error al cargar historial: {error_info}")
+            traceback.print_exc()
+            self.root.after(0, lambda err=error_info: self._show_history_error(err))
+
+    def _update_history_area(self, topic, messages):
+        self.history_area.config(state="normal")
+        self.history_area.delete("1.0", tk.END)
+        if not messages:
+            self.history_area.insert(tk.END, f"No hay mensajes históricos para el tópico '{topic}'.\n")
+        else:
+            self.history_area.insert(tk.END, f"=== Historial de mensajes para '{topic}' (últimos {len(messages)}) ===\n\n")
+            for msg in messages:
+                if isinstance(msg, dict):
+                    fecha = msg.get("readable_time", "")
+                    mensaje = msg.get("message", "")
+                    self.history_area.insert(tk.END, f"[{fecha}] {mensaje}\n\n")
+                else:
+                    self.history_area.insert(tk.END, f"{msg}\n\n")
+        self.history_area.see("1.0")
+        self.history_area.config(state="disabled")
+    
+    def _show_history_error(self, error_message):
+        try:
+            if not self.running or not self.root.winfo_exists():
+                return
+            self.history_area.config(state="normal")
+            self.history_area.delete("1.0", tk.END)
+            self.history_area.insert(tk.END, f"Error al cargar historial: {error_message}\n")
+            self.history_area.config(state="disabled")
+            if self.running and self.root.winfo_exists():
+                messagebox.showerror("Error", f"No se pudo cargar el historial: {error_message}")
+        except Exception:
+            pass
+    
+    def clear_history(self):
+        self.history_area.config(state="normal")
+        self.history_area.delete("1.0", tk.END)
+        self.history_area.config(state="disabled")
+    
     def poll_messages(self):
         while self.running:
             if self.is_connected:
-                self.client.poll()
+                try:
+                    self.client.poll()
+                except Exception as e:
+                    print(f"Error en poll: {e}")
             time.sleep(0.1)
     
     def on_closing(self):

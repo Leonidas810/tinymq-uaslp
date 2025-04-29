@@ -2,6 +2,7 @@
 #include "terminal_ui.h"
 #include <chrono>
 #include <iostream>
+#include <nlohmann/json.hpp>
 
 namespace tinymq
 {
@@ -389,10 +390,23 @@ namespace tinymq
                     MessageCallback callback = nullptr;
                     {
                         std::lock_guard<std::mutex> lock(mutex_);
+                        // Buscar callback exacto
                         auto it = topic_handlers_.find(topic);
                         if (it != topic_handlers_.end())
                         {
                             callback = it->second;
+                        }
+                        // Buscar callback por wildcard si no hay exacto
+                        if (!callback)
+                        {
+                            for (const auto &entry : topic_handlers_)
+                            {
+                                if (topic_matches(entry.first, topic))
+                                {
+                                    callback = entry.second;
+                                    break;
+                                }
+                            }
                         }
                     }
 
@@ -403,6 +417,98 @@ namespace tinymq
                     }
                 }
             }
+        }
+
+        bool Client::topic_matches(const std::string &sub, const std::string &pub)
+        {
+            if (sub == pub)
+                return true;
+            size_t sub_pos = 0, pub_pos = 0;
+            while (sub_pos < sub.size() && pub_pos < pub.size())
+            {
+                if (sub[sub_pos] == '#')
+                {
+                    return sub_pos + 1 == sub.size();
+                }
+                if (sub[sub_pos] == '+')
+                {
+                    while (pub_pos < pub.size() && pub[pub_pos] != '/')
+                        ++pub_pos;
+                    ++sub_pos;
+                    if (pub_pos < pub.size())
+                        ++pub_pos;
+                }
+                else if (sub[sub_pos] == pub[pub_pos])
+                {
+                    ++sub_pos;
+                    ++pub_pos;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            if (sub_pos == sub.size() - 1 && sub[sub_pos] == '#')
+                return true;
+            return sub_pos == sub.size() && pub_pos == pub.size();
+        }
+
+        // This function retrieves the message history for a given topic.
+        std::vector<std::string> Client::get_history(const std::string &topic, int limit, int timeout)
+        {
+            using json = nlohmann::json;
+            std::vector<std::string> result;
+            std::string response_topic = "_storage/response/" + topic;
+            std::mutex mtx;
+            std::condition_variable cv;
+            bool received = false;
+            std::string response_json;
+
+            auto callback = [&](const std::string &t, const std::vector<uint8_t> &msg)
+            {
+                std::lock_guard<std::mutex> lock(mtx);
+                response_json = std::string(msg.begin(), msg.end());
+                received = true;
+                cv.notify_one();
+            };
+
+            subscribe(response_topic, callback);
+
+            json query = {
+                {"action", "query"},
+                {"topic", topic},
+                {"limit", limit}};
+            publish("_storage/query/" + topic, query.dump());
+
+            {
+                std::unique_lock<std::mutex> lock(mtx);
+                if (!cv.wait_for(lock, std::chrono::seconds(timeout), [&]
+                                 { return received; }))
+                {
+                    unsubscribe(response_topic);
+                    return {}; // Timeout
+                }
+            }
+
+            unsubscribe(response_topic);
+
+            try
+            {
+                auto resp = json::parse(response_json);
+                if (resp.contains("messages") && resp["messages"].is_array())
+                {
+                    for (const auto &msg : resp["messages"])
+                    {
+                        std::string line = "[" + msg.value("readable_time", "") + "] " + msg.value("message", "");
+                        result.push_back(line);
+                    }
+                }
+            }
+            catch (...)
+            {
+                // Ignore parse errors
+            }
+            return result;
         }
 
         bool Client::send_packet(const Packet &packet)

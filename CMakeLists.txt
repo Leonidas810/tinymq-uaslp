@@ -14,6 +14,14 @@ find_package(Boost REQUIRED COMPONENTS system thread)
 # Include directories Boost
 include_directories(${Boost_INCLUDE_DIRS})
 
+# Incluir nlohmann/json (como cabecera única)
+include(FetchContent)
+FetchContent_Declare(
+    json
+    URL https://github.com/nlohmann/json/releases/download/v3.11.2/json.tar.xz
+)
+FetchContent_MakeAvailable(json)
+
 # Find pybind11 
 find_package(pybind11 REQUIRED)
 
@@ -27,4 +35,4 @@ file(GLOB_RECURSE SOURCES "src/*.cpp")
 pybind11_add_module(tinymq_module ${SOURCES})
 
 # Link libraries
-target_link_libraries(tinymq_module PRIVATE ${Boost_LIBRARIES})
+target_link_libraries(tinymq_module PRIVATE ${Boost_LIBRARIES} nlohmann_json::nlohmann_json)

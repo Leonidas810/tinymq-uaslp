@@ -16,9 +16,16 @@ include_directories(${Boost_INCLUDE_DIRS} ../src)
 
 # Find pybind11 
 find_package(pybind11 REQUIRED)
-
-# Include directories pybind11
 include_directories(${pybind11_INCLUDE_DIRS})
+
+# Añadir nlohmann/json
+include(FetchContent)
+FetchContent_Declare(
+    json
+    URL https://github.com/nlohmann/json/releases/download/v3.11.2/json.tar.xz
+)
+FetchContent_MakeAvailable(json)
+include_directories(${json_SOURCE_DIR}/include)
 
 # Especificar archivos para el módulo Python (sin cli.cpp ni main.cpp)
 set(MODULE_SOURCES
