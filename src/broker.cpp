@@ -49,7 +49,7 @@ namespace tinymq
         try
         {
 
-            db_conn_ = std::make_unique<pqxx::connection>("dbname=tinymq user=postgres password=<password> host=<host> port=5432");
+            db_conn_ = std::make_unique<pqxx::connection>("dbname=tinymq user=postgres password=<pass> host=<host> port=5432");
 
             if (db_conn_->is_open())
             {
@@ -155,6 +155,26 @@ namespace tinymq
             }
 
             it->second.reset();
+        }
+
+        try {
+            pqxx::work txn(*db_conn_);
+    
+            pqxx::result result = txn.exec_params(
+                "SELECT id FROM chat_users WHERE username = $1", client_id);
+    
+            if (result.empty()) {
+                txn.exec_params(
+                    "INSERT INTO chat_users (username) VALUES ($1)", client_id);
+    
+                std::cout << "Usuario '" << client_id << "' registrado en la base de datos.\n";
+            } else {
+                std::cout << "Usuario '" << client_id << "' ya existe.\n";
+            }
+    
+            txn.commit();
+        } catch (const std::exception &e) {
+            std::cerr << "Error al registrar usuario: " << e.what() << std::endl;
         }
 
         sessions_[client_id] = session;

@@ -4,5 +4,8 @@
     "ctime": "cpp",
     "ostream": "cpp"
   },
-  "cSpell.words": ["tinymq"]
+  "cSpell.words": [
+    "tinymq"
+  ],
+  "cmake.sourceDirectory": "/wsl.localhost/Ubuntu/home/leonidas/tinymq-uaslp"
 }
