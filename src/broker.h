@@ -54,6 +54,10 @@ namespace tinymq
         // Método para aceptar nuevas conexiones - cambié el nombre para que coincida
         void accept_connections();
 
+        //Metodo para cargar datos de la DB 
+        void loadTopicsFromDatabase();
+
+
         // Asio I/O Context
         boost::asio::io_context io_context_;
         boost::asio::ip::tcp::acceptor acceptor_;

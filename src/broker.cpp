@@ -23,6 +23,30 @@ namespace tinymq
         stop();
     }
 
+    void Broker::loadTopicsFromDatabase()
+{
+    try
+    {
+        pqxx::work txn(*db_conn_); 
+
+        pqxx::result result = txn.exec("SELECT name FROM chat_topics");
+
+        for (const auto &row : result)
+        {
+            std::string topic_name = row["name"].as<std::string>();
+            topic_subscribers_[topic_name] = {}; 
+        }
+
+        txn.commit();
+
+        std::cout << "Topics cargados desde la base de datos: " << topic_subscribers_.size() << std::endl;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Error al cargar topics desde la base de datos: " << e.what() << std::endl;
+    }
+}
+
     void Broker::start()
     {
         if (running_)
@@ -48,12 +72,13 @@ namespace tinymq
 
         try
         {
-
-            db_conn_ = std::make_unique<pqxx::connection>("dbname=tinymq user=postgres password=<pass> host=<host> port=5432");
+            db_conn_ = std::make_unique<pqxx::connection>("dbname=tinymq user=postgres password=cns host=10.20.5.67 port=5432");
 
             if (db_conn_->is_open())
             {
                 std::cout << "Conexión exitosa a la base de datos: " << db_conn_->dbname() << std::endl;
+
+                loadTopicsFromDatabase();
             }
         }
         catch (const std::exception &e)
@@ -169,9 +194,25 @@ namespace tinymq
     
                 std::cout << "Usuario '" << client_id << "' registrado en la base de datos.\n";
             } else {
-                std::cout << "Usuario '" << client_id << "' ya existe.\n";
+                // Si existe...
+                int user_id = result[0]["id"].as<int>();
+                std::cout << "Usuario '" << client_id << "' ya existe con ID: " << user_id << "\n";
+
+                // Paso 2: Obtener los nombres de los topics a los que está suscrito
+                pqxx::result topics_result = txn.exec_params(
+                    "SELECT t.name FROM chat_subscriptions s "
+                    "JOIN chat_topics t ON s.topic_id = t.id "
+                    "WHERE s.user_id = $1", user_id);
+
+                std::cout << "Topics suscritos por el usuario:\n";
+                for (const auto &row : topics_result) {
+                    std::string topic_name = row["name"].as<std::string>();
+                    std::cout << "- " << topic_name << "\n";
+                    subscribe(session, topic_name);
+                }
             }
     
+            
             txn.commit();
         } catch (const std::exception &e) {
             std::cerr << "Error al registrar usuario: " << e.what() << std::endl;
