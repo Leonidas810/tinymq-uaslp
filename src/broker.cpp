@@ -24,28 +24,28 @@ namespace tinymq
     }
 
     void Broker::loadTopicsFromDatabase()
-{
-    try
     {
-        pqxx::work txn(*db_conn_); 
-
-        pqxx::result result = txn.exec("SELECT name FROM chat_topics");
-
-        for (const auto &row : result)
+        try
         {
-            std::string topic_name = row["name"].as<std::string>();
-            topic_subscribers_[topic_name] = {}; 
+            pqxx::work txn(*db_conn_); 
+
+            pqxx::result result = txn.exec("SELECT name FROM chat_topics");
+
+            for (const auto &row : result)
+            {
+                std::string topic_name = row["name"].as<std::string>();
+                topic_subscribers_[topic_name] = {}; 
+            }
+
+            txn.commit();
+
+            std::cout << "Topics cargados desde la base de datos: " << topic_subscribers_.size() << std::endl;
         }
-
-        txn.commit();
-
-        std::cout << "Topics cargados desde la base de datos: " << topic_subscribers_.size() << std::endl;
+        catch (const std::exception &e)
+        {
+            std::cerr << "Error al cargar topics desde la base de datos: " << e.what() << std::endl;
+        }
     }
-    catch (const std::exception &e)
-    {
-        std::cerr << "Error al cargar topics desde la base de datos: " << e.what() << std::endl;
-    }
-}
 
     void Broker::start()
     {
@@ -194,11 +194,9 @@ namespace tinymq
     
                 std::cout << "Usuario '" << client_id << "' registrado en la base de datos.\n";
             } else {
-                // Si existe...
                 int user_id = result[0]["id"].as<int>();
                 std::cout << "Usuario '" << client_id << "' ya existe con ID: " << user_id << "\n";
 
-                // Paso 2: Obtener los nombres de los topics a los que está suscrito
                 pqxx::result topics_result = txn.exec_params(
                     "SELECT t.name FROM chat_subscriptions s "
                     "JOIN chat_topics t ON s.topic_id = t.id "
@@ -263,6 +261,37 @@ namespace tinymq
         auto &subscribers = topic_subscribers_[topic];
         if (std::find(subscribers.begin(), subscribers.end(), session) == subscribers.end())
         {
+            try {
+                pqxx::work txn(*db_conn_);
+                pqxx::result result = txn.exec_params(
+                    "SELECT id FROM chat_topics WHERE name = $1", topic);
+                
+                if (result.empty()) {
+                    pqxx::result user_result = txn.exec_params(
+                        "SELECT id FROM chat_users WHERE username = $1", session->client_id());
+            
+                    if (!user_result.empty()) {
+                        int user_id = user_result[0]["id"].as<int>();
+            
+                        txn.exec_params(
+                            "INSERT INTO chat_topics (name, created_by) VALUES ($1, $2)",
+                            topic, user_id);
+                        
+                        std::cout << "Topic '" << topic << "' creado por usuario ID: " << user_id << "\n";
+                    } else {
+                        std::cerr << "Error: Usuario no encontrado para crear el topic\n";
+                    }
+                } else {
+                    std::cout << "El topic '" << topic << "' ya existe.\n";
+                }
+            
+                txn.commit();
+
+                //error here with : Error al registrar topic: Started new transaction while transaction was still active.
+            } catch (const std::exception &e) {
+                std::cerr << "Error al registrar topic: " << e.what() << std::endl;
+            }
+
             subscribers.push_back(session);
             ui::print_message("Topic", "Client " + session->client_id() + " subscribed to topic: " + topic, ui::MessageType::INFO);
         }
