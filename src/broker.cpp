@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <pqxx/pqxx>
 using json = nlohmann::json;
 
 namespace tinymq
@@ -43,6 +44,21 @@ namespace tinymq
             } catch (const std::exception& e) {
                 ui::print_message("Thread", "Exception: " + std::string(e.what()), ui::MessageType::ERROR);
             } });
+        }
+
+        try
+        {
+
+            db_conn_ = std::make_unique<pqxx::connection>("dbname=tinymq user=postgres password=<password> host=<host> port=5432");
+
+            if (db_conn_->is_open())
+            {
+                std::cout << "Conexión exitosa a la base de datos: " << db_conn_->dbname() << std::endl;
+            }
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << "Error: " << e.what() << std::endl;
         }
 
         ui::print_message("Broker", "Started on port " + std::to_string(acceptor_.local_endpoint().port()) + " with " + std::to_string(thread_pool_size_) + " threads",

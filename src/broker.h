@@ -12,6 +12,7 @@
 #include <atomic>
 #include <nlohmann/json.hpp>
 #include "packet.h"
+#include <pqxx/pqxx>
 
 namespace tinymq
 {
@@ -70,6 +71,9 @@ namespace tinymq
         // Mutex para la gestión de sesiones
         std::mutex sessions_mutex_;
         std::map<std::string, std::shared_ptr<Session>> sessions_;
+
+        //Db connection
+        std::unique_ptr<pqxx::connection> db_conn_;
     };
 
 } // namespace tinymq
