@@ -477,7 +477,9 @@ namespace tinymq
             json query = {
                 {"action", "query"},
                 {"topic", topic},
-                {"limit", limit}};
+                {"limit", limit}
+                // Puedes agregar aquí un campo "fields" si quieres pedir campos específicos
+            };
             publish("_storage/query/" + topic, query.dump());
 
             {
@@ -499,7 +501,14 @@ namespace tinymq
                 {
                     for (const auto &msg : resp["messages"])
                     {
-                        std::string line = "[" + msg.value("readable_time", "") + "] " + msg.value("message", "");
+                        std::string fecha = msg.value("sent_at", "");
+                        // std::string sender = std::to_string(msg.value("sender_id", 0));
+                        std::string content = msg.value("content", "");
+
+                        std::string line = "[" + fecha + "]";
+                        // if (!sender.empty())
+                        //   line += " <" + sender + ">";
+                        line += " " + content;
                         result.push_back(line);
                     }
                 }
