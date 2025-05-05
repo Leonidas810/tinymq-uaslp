@@ -27,14 +27,14 @@ namespace tinymq
     {
         try
         {
-            pqxx::work txn(*db_conn_); 
+            pqxx::work txn(*db_conn_);
 
             pqxx::result result = txn.exec("SELECT name FROM chat_topics");
 
             for (const auto &row : result)
             {
                 std::string topic_name = row["name"].as<std::string>();
-                topic_subscribers_[topic_name] = {}; 
+                topic_subscribers_[topic_name] = {};
             }
 
             txn.commit();
@@ -182,18 +182,22 @@ namespace tinymq
             it->second.reset();
         }
 
-        try {
+        try
+        {
             pqxx::work txn(*db_conn_);
-    
+
             pqxx::result result = txn.exec_params(
                 "SELECT id FROM chat_users WHERE username = $1", client_id);
-    
-            if (result.empty()) {
+
+            if (result.empty())
+            {
                 txn.exec_params(
                     "INSERT INTO chat_users (username) VALUES ($1)", client_id);
-    
+
                 std::cout << "Usuario '" << client_id << "' registrado en la base de datos.\n";
-            } else {
+            }
+            else
+            {
                 int user_id = result[0]["id"].as<int>();
                 std::cout << "Usuario '" << client_id << "' ya existe con ID: " << user_id << "\n";
 
@@ -202,20 +206,21 @@ namespace tinymq
                     "JOIN chat_topics t ON s.topic_id = t.id "
                     "WHERE s.user_id = $1 AND s.deleted_at IS NULL",
                     user_id);
-                
 
                 std::cout << "Topics suscritos por el usuario:\n";
-                for (const auto &row : topics_result) {
+                for (const auto &row : topics_result)
+                {
                     std::string topic_name = row["name"].as<std::string>();
                     std::cout << "- " << topic_name << "\n";
                     auto &subscribers = topic_subscribers_[topic_name];
                     subscribers.push_back(session);
                 }
             }
-    
-            
+
             txn.commit();
-        } catch (const std::exception &e) {
+        }
+        catch (const std::exception &e)
+        {
             std::cerr << "Error al registrar usuario: " << e.what() << std::endl;
         }
 
@@ -264,52 +269,62 @@ namespace tinymq
         auto &subscribers = topic_subscribers_[topic];
         if (std::find(subscribers.begin(), subscribers.end(), session) == subscribers.end())
         {
-            try {
+            try
+            {
                 pqxx::work txn(*db_conn_);
-            
+
                 // Obtener ID del usuario
                 pqxx::result user_result = txn.exec_params(
                     "SELECT id FROM chat_users WHERE username = $1", session->client_id());
-            
-                if (user_result.empty()) {
+
+                if (user_result.empty())
+                {
                     std::cerr << "Error: Usuario no encontrado.\n";
                     return;
                 }
-            
+
                 int user_id = user_result[0]["id"].as<int>();
-            
+
                 // Verificar si el topic ya existe
                 pqxx::result topic_result = txn.exec_params(
                     "SELECT id FROM chat_topics WHERE name = $1", topic);
-            
+
                 int topic_id;
-                if (topic_result.empty()) {
+                if (topic_result.empty())
+                {
                     pqxx::result insert_result = txn.exec_params(
                         "INSERT INTO chat_topics (name, created_by) VALUES ($1, $2) RETURNING id",
                         topic, user_id);
-            
+
                     topic_id = insert_result[0]["id"].as<int>();
                     std::cout << "Topic '" << topic << "' creado por usuario ID: " << user_id << "\n";
-                } else {
+                }
+                else
+                {
                     topic_id = topic_result[0]["id"].as<int>();
                     std::cout << "El topic '" << topic << "' ya existe.\n";
                 }
-            
-                //Insertar subscripcion
-                try {
+
+                // Insertar subscripcion
+                try
+                {
                     txn.exec_params(
                         "INSERT INTO chat_subscriptions (user_id, topic_id) VALUES ($1, $2)",
                         user_id, topic_id);
                     std::cout << "Usuario " << user_id << " suscrito al topic " << topic_id << "\n";
-                } catch (const std::exception& e) {
+                }
+                catch (const std::exception &e)
+                {
                     std::cerr << "Nota: El usuario ya estaba suscrito o hubo un error: " << e.what() << "\n";
                 }
-            
+
                 txn.commit();
-            } catch (const std::exception& e) {
+            }
+            catch (const std::exception &e)
+            {
                 std::cerr << "Error al registrar topic o suscripción: " << e.what() << std::endl;
             }
-            
+
             subscribers.push_back(session);
             ui::print_message("Topic", "Client " + session->client_id() + " subscribed to topic: " + topic, ui::MessageType::INFO);
         }
@@ -318,6 +333,64 @@ namespace tinymq
     void Broker::unsubscribe(std::shared_ptr<Session> session, const std::string &topic)
     {
         std::lock_guard<std::mutex> lock(topics_mutex_);
+        const auto &client_id = session->client_id();
+
+        try
+        {
+            pqxx::work txn(*db_conn_);
+
+            // Obtener el ID del usuario
+            pqxx::result user_result = txn.exec_params(
+                "SELECT id FROM chat_users WHERE username = $1", client_id);
+
+            if (user_result.empty())
+            {
+                std::cerr << "Usuario no encontrado: " << client_id << std::endl;
+                return;
+            }
+
+            int user_id = user_result[0]["id"].as<int>();
+
+            // Obtener el ID del topic
+            pqxx::result topic_result = txn.exec_params(
+                "SELECT id FROM chat_topics WHERE name = $1", topic);
+
+            if (topic_result.empty())
+            {
+                std::cerr << "Topic no encontrado: " << topic << std::endl;
+                return;
+            }
+
+            int topic_id = topic_result[0]["id"].as<int>();
+
+            // Verificar que la suscripción exista y esté activa
+            pqxx::result sub_result = txn.exec_params(
+                "SELECT 1 FROM chat_subscriptions "
+                "WHERE user_id = $1 AND topic_id = $2 AND deleted_at IS NULL",
+                user_id, topic_id);
+
+            if (sub_result.empty())
+            {
+                std::cout << "No hay suscripción activa para desuscribir.\n";
+            }
+            else
+            {
+                // Marcar como desuscrita
+                txn.exec_params(
+                    "UPDATE chat_subscriptions "
+                    "SET deleted_at = CURRENT_TIMESTAMP "
+                    "WHERE user_id = $1 AND topic_id = $2",
+                    user_id, topic_id);
+
+                std::cout << "Usuario " << user_id << " desuscrito del topic " << topic_id << "\n";
+            }
+
+            txn.commit();
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << "Error desuscribiendo usuario: " << e.what() << std::endl;
+        }
 
         // Find the topic
         auto it = topic_subscribers_.find(topic);
