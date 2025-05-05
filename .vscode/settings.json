@@ -2,7 +2,8 @@
   "files.associations": {
     "*.embeddedhtml": "html",
     "ctime": "cpp",
-    "ostream": "cpp"
+    "ostream": "cpp",
+    "iostream": "cpp"
   },
   "cSpell.words": [
     "tinymq"

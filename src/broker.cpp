@@ -72,7 +72,7 @@ namespace tinymq
 
         try
         {
-            db_conn_ = std::make_unique<pqxx::connection>("dbname=tinymq user=postgres password=cns host=10.20.5.67 port=5432");
+            db_conn_ = std::make_unique<pqxx::connection>("dbname=tinymq user=postgres password=leolopez810 host=192.168.0.144 port=5432");
 
             if (db_conn_->is_open())
             {
@@ -200,13 +200,16 @@ namespace tinymq
                 pqxx::result topics_result = txn.exec_params(
                     "SELECT t.name FROM chat_subscriptions s "
                     "JOIN chat_topics t ON s.topic_id = t.id "
-                    "WHERE s.user_id = $1", user_id);
+                    "WHERE s.user_id = $1 AND s.deleted_at IS NULL",
+                    user_id);
+                
 
                 std::cout << "Topics suscritos por el usuario:\n";
                 for (const auto &row : topics_result) {
                     std::string topic_name = row["name"].as<std::string>();
                     std::cout << "- " << topic_name << "\n";
-                    subscribe(session, topic_name);
+                    auto &subscribers = topic_subscribers_[topic_name];
+                    subscribers.push_back(session);
                 }
             }
     
@@ -263,35 +266,50 @@ namespace tinymq
         {
             try {
                 pqxx::work txn(*db_conn_);
-                pqxx::result result = txn.exec_params(
+            
+                // Obtener ID del usuario
+                pqxx::result user_result = txn.exec_params(
+                    "SELECT id FROM chat_users WHERE username = $1", session->client_id());
+            
+                if (user_result.empty()) {
+                    std::cerr << "Error: Usuario no encontrado.\n";
+                    return;
+                }
+            
+                int user_id = user_result[0]["id"].as<int>();
+            
+                // Verificar si el topic ya existe
+                pqxx::result topic_result = txn.exec_params(
                     "SELECT id FROM chat_topics WHERE name = $1", topic);
-                
-                if (result.empty()) {
-                    pqxx::result user_result = txn.exec_params(
-                        "SELECT id FROM chat_users WHERE username = $1", session->client_id());
             
-                    if (!user_result.empty()) {
-                        int user_id = user_result[0]["id"].as<int>();
+                int topic_id;
+                if (topic_result.empty()) {
+                    pqxx::result insert_result = txn.exec_params(
+                        "INSERT INTO chat_topics (name, created_by) VALUES ($1, $2) RETURNING id",
+                        topic, user_id);
             
-                        txn.exec_params(
-                            "INSERT INTO chat_topics (name, created_by) VALUES ($1, $2)",
-                            topic, user_id);
-                        
-                        std::cout << "Topic '" << topic << "' creado por usuario ID: " << user_id << "\n";
-                    } else {
-                        std::cerr << "Error: Usuario no encontrado para crear el topic\n";
-                    }
+                    topic_id = insert_result[0]["id"].as<int>();
+                    std::cout << "Topic '" << topic << "' creado por usuario ID: " << user_id << "\n";
                 } else {
+                    topic_id = topic_result[0]["id"].as<int>();
                     std::cout << "El topic '" << topic << "' ya existe.\n";
                 }
             
+                //Insertar subscripcion
+                try {
+                    txn.exec_params(
+                        "INSERT INTO chat_subscriptions (user_id, topic_id) VALUES ($1, $2)",
+                        user_id, topic_id);
+                    std::cout << "Usuario " << user_id << " suscrito al topic " << topic_id << "\n";
+                } catch (const std::exception& e) {
+                    std::cerr << "Nota: El usuario ya estaba suscrito o hubo un error: " << e.what() << "\n";
+                }
+            
                 txn.commit();
-
-                //error here with : Error al registrar topic: Started new transaction while transaction was still active.
-            } catch (const std::exception &e) {
-                std::cerr << "Error al registrar topic: " << e.what() << std::endl;
+            } catch (const std::exception& e) {
+                std::cerr << "Error al registrar topic o suscripción: " << e.what() << std::endl;
             }
-
+            
             subscribers.push_back(session);
             ui::print_message("Topic", "Client " + session->client_id() + " subscribed to topic: " + topic, ui::MessageType::INFO);
         }
