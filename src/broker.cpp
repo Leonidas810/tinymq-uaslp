@@ -410,148 +410,37 @@ namespace tinymq
         }
     }
 
-    bool topic_matches(const std::string &sub, const std::string &pub)
-    {
-        if (sub == pub)
-            return true;
-        size_t sub_pos = 0, pub_pos = 0;
-        while (sub_pos < sub.size() && pub_pos < pub.size())
-        {
-            if (sub[sub_pos] == '#')
-            {
-                // '#' al final del sub-topic
-                return sub_pos + 1 == sub.size();
-            }
-            if (sub[sub_pos] == '+')
-            {
-                // Salta hasta el siguiente separador en pub
-                while (pub_pos < pub.size() && pub[pub_pos] != '/')
-                    ++pub_pos;
-                ++sub_pos;
-                if (pub_pos < pub.size())
-                    ++pub_pos;
-            }
-            else if (sub[sub_pos] == pub[pub_pos])
-            {
-                ++sub_pos;
-                ++pub_pos;
-            }
-            else
-            {
-                return false;
-            }
-        }
-        // Permitir '#' al final del sub-topic
-        if (sub_pos == sub.size() - 1 && sub[sub_pos] == '#')
-            return true;
-        return sub_pos == sub.size() && pub_pos == pub.size();
-    }
-
-    void Broker::publish(const std::string &topic, const std::vector<uint8_t> &message)
-    {
+    void Broker::publish(const std::string& topic, const std::vector<uint8_t>& message) {
         std::vector<std::shared_ptr<Session>> subscribers;
-
+        
         {
             std::lock_guard<std::mutex> lock(topics_mutex_);
-            for (const auto &entry : topic_subscribers_)
-            {
-                const std::string &sub_topic = entry.first;
-                if (topic_matches(sub_topic, topic))
-                {
-                    subscribers.insert(subscribers.end(), entry.second.begin(), entry.second.end());
-                    ui::print_message("Broker", "Wildcard/prefijo: " + sub_topic + " coincide con publicación en: " + topic, ui::MessageType::INFO);
-                }
+            auto it = topic_subscribers_.find(topic);
+            if (it != topic_subscribers_.end()) {
+                subscribers = it->second;
             }
         }
-
-        if (subscribers.empty())
-        {
+        
+        if (subscribers.empty()) {
             ui::print_message("Topic", "No subscribers for topic: " + topic, ui::MessageType::INFO);
+            return;
         }
-        else
-        {
-            ui::print_message("Topic", "Publishing to " + std::to_string(subscribers.size()) + " subscribers on topic: " + topic, ui::MessageType::OUTGOING);
-        }
-
+        
+        ui::print_message("Topic", "Publishing to " + std::to_string(subscribers.size()) + 
+                       " subscribers on topic: " + topic, ui::MessageType::OUTGOING);
+        
         std::vector<uint8_t> payload;
+        
         payload.push_back(static_cast<uint8_t>(topic.size()));
+        
         payload.insert(payload.end(), topic.begin(), topic.end());
+        
         payload.insert(payload.end(), message.begin(), message.end());
-
+        
         Packet packet(PacketType::PUB, 0, payload);
-
-        for (auto &subscriber : subscribers)
-        {
+        
+        for (auto& subscriber : subscribers) {
             subscriber->send_packet(packet);
         }
-
-        // Reenviar al storage_service si no es un mensaje del sistema
-        if (!topic.empty() && topic[0] != '_' && topic != "_broker/storage")
-        {
-            forward_to_storage(topic, message);
-        }
     }
-
-    // ===== NUEVO MÉTODO =====
-    void Broker::forward_to_storage(const std::string &topic, const std::vector<uint8_t> &message)
-    {
-        try
-        {
-            // Convertir el mensaje a string
-            std::string message_str(message.begin(), message.end());
-
-            // Crear el JSON para storage_service
-            json storage_payload = {
-                {"topic", topic},
-                {"message", message_str},
-                {"timestamp", std::time(nullptr)}};
-
-            // Convertir a string y luego a bytes
-            std::string json_str = storage_payload.dump();
-            std::vector<uint8_t> storage_message(json_str.begin(), json_str.end());
-
-            // Publicar directamente al tópico de storage
-            std::string storage_topic = "_broker/storage";
-
-            // No usar publish() para evitar recursión infinita
-            std::vector<std::shared_ptr<Session>> storage_subscribers;
-
-            {
-                std::lock_guard<std::mutex> lock(topics_mutex_);
-                auto it = topic_subscribers_.find(storage_topic);
-                if (it != topic_subscribers_.end())
-                {
-                    storage_subscribers = it->second;
-                }
-            }
-
-            if (!storage_subscribers.empty())
-            {
-                // Preparar payload para storage_service
-                std::vector<uint8_t> storage_payload;
-                storage_payload.push_back(static_cast<uint8_t>(storage_topic.size()));
-                storage_payload.insert(storage_payload.end(), storage_topic.begin(), storage_topic.end());
-                storage_payload.insert(storage_payload.end(), storage_message.begin(), storage_message.end());
-
-                Packet storage_packet(PacketType::PUB, 0, storage_payload);
-
-                // Enviar a todos los suscriptores de storage
-                for (auto &subscriber : storage_subscribers)
-                {
-                    subscriber->send_packet(storage_packet);
-                }
-
-                ui::print_message("Storage", "Message forwarded to storage service", ui::MessageType::INFO);
-            }
-            else
-            {
-                ui::print_message("Storage", "Storage service not available", ui::MessageType::WARNING);
-            }
-        }
-        catch (const std::exception &e)
-        {
-            ui::print_message("Storage", "Error forwarding to storage: " + std::string(e.what()),
-                              ui::MessageType::ERROR);
-        }
-    }
-}
+    } 
