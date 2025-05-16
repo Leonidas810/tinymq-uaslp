@@ -443,4 +443,4 @@ namespace tinymq
             subscriber->send_packet(packet);
         }
     }
-    } 
+} 
